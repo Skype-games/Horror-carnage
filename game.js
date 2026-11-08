@@ -27,7 +27,7 @@
   const ambient = new T.HemisphereLight(0x7c857b, 0x1b120e, 0.5);
   scene.add(ambient);
 
-  const flashlightLight = new T.SpotLight(0xffe9b2, 28, 12, Math.PI / 7, 0.75, 1.4);
+  const flashlightLight = new T.SpotLight(0xffe9b2, 42, 19, Math.PI / 6, 0.62, 1.15);
   flashlightLight.position.set(0, 0, 0);
   flashlightLight.target.position.set(0, 0, -1);
   camera.add(flashlightLight);
@@ -64,6 +64,9 @@
     crouching: false,
     running: false,
     hidden: false,
+    hideType: null,
+    hideExit: null,
+    sensitivity: 1,
     player: {
       x: 0, z: 4.8, yaw: 0, pitch: 0,
       hp: 100, food: 100, water: 100, inf: 0,
@@ -194,12 +197,26 @@
 
     // Furniture
     const addFurniture = (x, z, w, d, h, kind = 'table') => {
-      const color = kind === 'wardrobe' ? 0x2f2621 : kind === 'cabinet' ? 0x433b31 : 0x4a3d31;
+      const color = kind === 'wardrobe' ? 0x2f2621 : kind === 'cabinet' || kind === 'drawer' ? 0x433b31 : 0x4a3d31;
       const base = mat(kind + state.roomIndex, color);
-      const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), base);
-      mesh.position.set(x, h / 2, z);
-      roomGroup.add(mesh);
-      state.roomObj.push(mesh);
+      let mesh;
+      if (kind === 'table' && h <= 1.15) {
+        mesh = new T.Mesh(new T.BoxGeometry(w, 0.16, d), base);
+        mesh.position.set(x, h - 0.08, z);
+        roomGroup.add(mesh);
+        state.roomObj.push(mesh);
+        for (const ox of [-w * 0.42, w * 0.42]) for (const oz of [-d * 0.38, d * 0.38]) {
+          const leg = new T.Mesh(new T.BoxGeometry(0.12, h - 0.16, 0.12), base);
+          leg.position.set(x + ox, (h - 0.16) / 2, z + oz);
+          roomGroup.add(leg);
+          state.roomObj.push(leg);
+        }
+      } else {
+        mesh = new T.Mesh(new T.BoxGeometry(w, h, d), base);
+        mesh.position.set(x, h / 2, z);
+        roomGroup.add(mesh);
+        state.roomObj.push(mesh);
+      }
       state.obstacles.push({ x, z, r: Math.max(w, d) * 0.52 });
       if (kind === 'wardrobe') {
         const door = new T.Mesh(new T.BoxGeometry(w * 0.75, h * 0.9, 0.07), mat('wardrobeDoor', 0x4a352d));
@@ -212,13 +229,43 @@
         state.roomObj.push(handle);
         state.interactables.push({ type: 'hide', pos: v3(x, 0, z), object: mesh });
       }
+      if (kind === 'table' && h <= 1.15) {
+        state.interactables.push({ type: 'hideTable', pos: v3(x, 0, z), object: mesh });
+      }
+      if (kind === 'drawer') {
+        const front = new T.Mesh(new T.BoxGeometry(w * 0.78, 0.24, 0.06), mat('drawerFront', 0x594637));
+        front.position.set(x, h * 0.68, z + d / 2 + 0.035);
+        roomGroup.add(front);
+        state.roomObj.push(front);
+        const pull = new T.Mesh(new T.BoxGeometry(0.18, 0.045, 0.06), mat('drawerPull', 0xb49765));
+        pull.position.set(x, h * 0.68, z + d / 2 + 0.08);
+        roomGroup.add(pull);
+        state.roomObj.push(pull);
+        state.interactables.push({ type: 'drawer', pos: v3(x, 0, z + d / 2 + 0.3), object: mesh, front, pull, opened: false });
+      }
       return mesh;
     };
 
     if (state.roomIndex === 0) {
-      addFurniture(-4, -1, 2.2, 1.2, 1.2);
-      addFurniture(4.4, -1.7, 1.3, 1.1, 2.4, 'wardrobe');
-      addFurniture(0.6, 2.3, 1.7, 1.2, 0.9, 'cabinet');
+      addFurniture(-5.65, -1.2, 1.15, 1.15, 2.4, 'wardrobe');
+      addFurniture(5.65, 1.0, 1.15, 1.15, 2.4, 'wardrobe');
+      addFurniture(-2.2, -0.5, 2.2, 1.35, 0.78, 'table');
+      addFurniture(3.9, 1.0, 1.5, 1.1, 1.05, 'drawer');
+      addFurniture(-4.2, 3.2, 1.5, 1.0, 0.72, 'cabinet');
+      // Infected plaster and broken furniture make this wing visibly abandoned.
+      for (const [x, z, sx, sz] of [[-6.95, -4.8, 0.18, 1.1], [6.95, 4.2, 0.18, 1.35], [-1.4, 3.1, 0.8, 0.22]]) {
+        const stain = new T.Mesh(new T.BoxGeometry(sx, 1.5, sz), mat('infectedStain', 0x35402c, 0.98, 0x17220e, 0.18));
+        stain.position.set(x, 1.2, z);
+        roomGroup.add(stain);
+        state.roomObj.push(stain);
+      }
+      for (const [x, z, rot] of [[-3.5, 1.8, 0.4], [-1.5, 2.4, -0.7], [2.4, -2.4, 0.9], [0.2, 3.8, 0.2]]) {
+        const plank = new T.Mesh(new T.BoxGeometry(0.95, 0.12, 0.22), mat('brokenWood', 0x49372a));
+        plank.position.set(x, 0.12, z);
+        plank.rotation.y = rot;
+        roomGroup.add(plank);
+        state.roomObj.push(plank);
+      }
     } else if (state.roomIndex === 1) {
       addFurniture(-4.2, -1.8, 1.4, 1.25, 2.4, 'wardrobe');
       addFurniture(2.4, -0.2, 2.8, 1.2, 1.1);
@@ -250,7 +297,7 @@
     }
 
     const pickups =
-      state.roomIndex === 0 ? [['key', -4.9, 2.8, 'Llave del ala este'], ['food', -3.0, 2.4, 'Lata sin abrir'], ['water', 2.9, -3.0, 'Agua sellada']] :
+      state.roomIndex === 0 ? [['key', 3.9, 2.35, 'Llave del ala este'], ['food', -3.0, 2.4, 'Lata sin abrir'], ['water', 2.9, -3.0, 'Agua sellada']] :
       state.roomIndex === 1 ? [['key', -0.9, 3.4, 'Llave del comedor'], ['water', 4.0, 3.2, 'Botella olvidada'], ['ammo', -5.2, 1.5, 'Munición vieja']] :
       state.roomIndex === 2 ? [['key', 5.4, 2.0, 'Llave de la enfermería'], ['food', -4.0, -2.3, 'Ración limpia'], ['vaccine', -4.5, 3.5, 'Vacuna extraña'], ['food', 3.3, -2.2, 'Carne dudosa']] :
       state.roomIndex === 3 ? [['key', 4.2, 2.4, 'Llave del ascensor'], ['vaccine', -5.0, 2.8, 'Vacuna extraña'], ['water', 2.2, -3.0, 'Botella sellada']] :
@@ -267,12 +314,15 @@
       group.add(glow);
       scene.add(group);
       state.roomObj.push(group);
-      state.interactables.push({ type: 'item', itemType: type, label, pos: v3(x, 0, z), object: group, collected: false });
+      const inDrawer = state.roomIndex === 0 && type === 'key';
+      group.visible = !inDrawer;
+      state.interactables.push({ type: 'item', itemType: type, label, pos: v3(x, 0, z), object: group, collected: false, lockedInDrawer: inDrawer });
     }
 
     if (state.roomIndex < 4) {
       const enemyGroup = new T.Group();
-      enemyGroup.position.set(-3.0, 0, -3.0);
+      const patrol = [[-5.3, -5.7], [0, -5.7], [5.3, -5.7], [5.3, 5.7], [0, 5.7], [-5.3, 5.7]];
+      enemyGroup.position.set(patrol[0][0], 0, patrol[0][1]);
       const body = new T.Mesh(new T.CapsuleGeometry(0.52, 1.0, 4, 10), mat('monsterBody', 0x2f2120, 0.95));
       body.position.y = 1.1;
       enemyGroup.add(body);
@@ -288,7 +338,7 @@
       enemyGroup.add(eyeR);
       scene.add(enemyGroup);
       state.roomObj.push(enemyGroup);
-      state.enemy = { group: enemyGroup, x: -3, z: -3, hp: 2, alive: true, stun: 0, phase: Math.random() * 6 };
+      state.enemy = { group: enemyGroup, x: patrol[0][0], z: patrol[0][1], hp: 2, alive: true, stun: 0, phase: Math.random() * 6, patrol, waypoint: 1, alarmed: false };
     }
 
     scene.background.set(state.roomIndex === 3 ? 0x10100f : 0x090908);
@@ -386,7 +436,7 @@
     let bestD = 999;
 
     for (const it of state.interactables) {
-      if (it.type === 'item' && it.collected) continue;
+      if (it.type === 'item' && (it.collected || it.lockedInDrawer)) continue;
       const pos = it.pos;
       const dx = pos.x - state.player.x;
       const dz = pos.z - state.player.z;
@@ -425,10 +475,59 @@
       return;
     }
 
+    if (target.type === 'drawer') {
+      if (!target.opened) {
+        target.opened = true;
+        target.front.position.z += 0.38;
+        target.pull.position.z += 0.38;
+        for (const item of state.interactables) {
+          if (item.type === 'item' && item.lockedInDrawer) {
+            item.lockedInDrawer = false;
+            item.object.visible = true;
+          }
+        }
+        toast('El cajón se abre. Algo brilla en su interior.');
+      } else {
+        toast('El cajón está vacío.');
+      }
+      return;
+    }
+
     if (target.type === 'hide') {
-      state.hidden = !state.hidden;
+      if (state.hidden && state.hideType === 'wardrobe') {
+        state.hidden = false;
+        state.hideType = null;
+        toast('Sales del armario.');
+      } else if (!state.hidden) {
+        state.hidden = true;
+        state.hideType = 'wardrobe';
+        toast('Te escondes en el armario.');
+      }
       $('hideNote').classList.toggle('show', state.hidden);
-      toast(state.hidden ? 'Te escondes en la sombra.' : 'Sales del escondite.');
+      return;
+    }
+
+    if (target.type === 'hideTable') {
+      if (state.hidden && state.hideType === 'table') {
+        if (state.hideExit) {
+          state.player.x = state.hideExit.x;
+          state.player.z = state.hideExit.z;
+        }
+        state.hideExit = null;
+        state.hidden = false;
+        state.hideType = null;
+        toast('Sales de debajo de la mesa.');
+      } else if (state.crouching && !state.hidden) {
+        state.hideExit = { x: state.player.x, z: state.player.z };
+        state.player.x = target.pos.x;
+        state.player.z = target.pos.z;
+        state.hidden = true;
+        state.hideType = 'table';
+        toast('Te ocultas bajo la mesa. No hagas ruido.');
+      } else {
+        toast('Agáchate primero para meterte bajo la mesa.');
+      }
+      $('hideNote').classList.toggle('show', state.hidden);
       return;
     }
 
@@ -473,6 +572,8 @@
     state.selected = 0;
     state.flashlight = true;
     state.hidden = false;
+    state.hideType = null;
+    state.hideExit = null;
     state.crouching = false;
     state.running = false;
     state.roomIndex = 0;
@@ -617,29 +718,43 @@
     camera.rotation.set(state.player.pitch, state.player.yaw, 0, 'YXZ');
 
     flashlightLight.visible = state.flashlight;
-    flashlightLight.intensity = state.flashlight ? 26 : 0;
+    flashlightLight.intensity = state.flashlight ? 42 : 0;
     flashlightLight.position.set(0, 0, 0);
     flashlightLight.target.position.set(0, 0, -1.4);
     flashlightLight.target.updateMatrixWorld();
 
     if (state.enemy && state.enemy.alive) {
-      const ex = state.player.x - state.enemy.x;
-      const ez = state.player.z - state.enemy.z;
-      const dist = Math.hypot(ex, ez);
-      if (dist > 0.6 && !state.hidden && state.enemy.stun <= 0) {
-        const speed = 1.6;
-        state.enemy.x += (ex / dist) * speed * dt;
-        state.enemy.z += (ez / dist) * speed * dt;
+      const enemy = state.enemy;
+      const waypoint = enemy.patrol[enemy.waypoint];
+      const dxToWaypoint = waypoint[0] - enemy.x;
+      const dzToWaypoint = waypoint[1] - enemy.z;
+      const waypointDistance = Math.hypot(dxToWaypoint, dzToWaypoint);
+      if (enemy.stun <= 0) {
+        if (waypointDistance < 0.12) {
+          enemy.waypoint = (enemy.waypoint + 1) % enemy.patrol.length;
+        } else {
+          const patrolSpeed = 1.15;
+          enemy.x += (dxToWaypoint / waypointDistance) * patrolSpeed * dt;
+          enemy.z += (dzToWaypoint / waypointDistance) * patrolSpeed * dt;
+          enemy.group.rotation.y = Math.atan2(dxToWaypoint, dzToWaypoint);
+        }
       }
-      state.enemy.stun = Math.max(0, state.enemy.stun - dt);
-      state.enemy.group.position.set(state.enemy.x, 0, state.enemy.z);
-      state.enemy.group.rotation.y = Math.atan2(state.player.x - state.enemy.x, state.player.z - state.enemy.z);
-      if (dist < 1.3 && !state.hidden) {
-        state.player.hp -= dt * 22;
-        $('danger').style.opacity = '0.8';
-      } else {
-        $('danger').style.opacity = Math.max(0, Number($('danger').style.opacity || 0) - dt * 1.4) + '';
+      enemy.stun = Math.max(0, enemy.stun - dt);
+      enemy.group.position.set(enemy.x, 0, enemy.z);
+
+      const dist = Math.hypot(state.player.x - enemy.x, state.player.z - enemy.z);
+      const alarm = dist < 5.5;
+      $('danger').classList.toggle('alarm', alarm);
+      $('danger').style.opacity = alarm ? '1' : (dist < 1.3 && !state.hidden ? '0.8' : '0');
+      if (alarm && !enemy.alarmed) {
+        beep(92, 0.32, 0.045, 'sawtooth');
+        toast('ALARMA: el demonio se acerca. ¡Escóndete!');
       }
+      enemy.alarmed = alarm;
+      if (dist < 1.3 && !state.hidden) state.player.hp -= dt * 22;
+    } else {
+      $('danger').classList.remove('alarm');
+      $('danger').style.opacity = '0';
     }
 
     if (state.face) {
@@ -652,7 +767,11 @@
     const prompt = $('prompt');
     const target = nearestInteractable();
     if (target) {
-      prompt.innerHTML = '<b>E</b>' + (target.type === 'hide' ? (state.hidden ? 'SALIR DEL ESCONDITE' : 'ESCONDERSE') : target.type === 'item' ? 'RECOGER · ' + target.label.toUpperCase() : 'ABRIR / USAR');
+      const message = target.type === 'hide' ? (state.hidden ? 'SALIR DEL ARMARIO' : 'ESCONDERSE EN EL ARMARIO') :
+        target.type === 'hideTable' ? (state.hidden && state.hideType === 'table' ? 'SALIR DE DEBAJO' : state.crouching ? 'ESCONDERSE BAJO LA MESA' : 'AGÁCHATE PARA ESCONDERTE') :
+        target.type === 'drawer' ? (target.opened ? 'REGISTRAR CAJÓN' : 'ABRIR EL CAJÓN') :
+        target.type === 'item' ? 'RECOGER · ' + target.label.toUpperCase() : 'ABRIR / USAR';
+      prompt.innerHTML = '<b>E</b>' + message;
       prompt.classList.add('show');
       $('crosshair').classList.add('hot');
     } else {
@@ -715,8 +834,8 @@
 
   document.addEventListener('mousemove', (event) => {
     if (!state.pointerLocked || !state.gameOn) return;
-    state.player.yaw -= event.movementX * 0.0024;
-    state.player.pitch = Math.max(-1.3, Math.min(1.3, state.player.pitch - event.movementY * 0.0018));
+    state.player.yaw -= event.movementX * 0.0024 * state.sensitivity;
+    state.player.pitch = Math.max(-1.3, Math.min(1.3, state.player.pitch - event.movementY * 0.0018 * state.sensitivity));
   });
 
   let touchLook = null;
@@ -737,8 +856,8 @@
     const dy = event.clientY - touchLook.y;
     touchLook.x = event.clientX;
     touchLook.y = event.clientY;
-    state.player.yaw -= dx * 0.003;
-    state.player.pitch = Math.max(-1.3, Math.min(1.3, state.player.pitch - dy * 0.002));
+    state.player.yaw -= dx * 0.003 * state.sensitivity;
+    state.player.pitch = Math.max(-1.3, Math.min(1.3, state.player.pitch - dy * 0.002 * state.sensitivity));
     event.preventDefault();
   });
   const endTouchLook = (event) => {
@@ -761,6 +880,14 @@
   $('audioBtn').addEventListener('click', () => {
     state.audioEnabled = !state.audioEnabled;
     $('audioBtn').textContent = state.audioEnabled ? 'AUDIO ON' : 'AUDIO OFF';
+  });
+
+  $('settingsBtn').addEventListener('click', () => {
+    $('settingsPanel').classList.toggle('show');
+  });
+  $('sensitivity').addEventListener('input', (event) => {
+    state.sensitivity = Number(event.target.value);
+    $('sensitivityValue').textContent = state.sensitivity.toFixed(1).replace('.', ',') + '×';
   });
 
   const joy = $('joy');

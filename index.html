@@ -9,7 +9,7 @@
 .game{height:100dvh;display:grid;grid-template-rows:64px 1fr 66px;background:radial-gradient(ellipse at 50% 40%,#252421,#090a0a 70%)}
 header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #49443a;letter-spacing:.14em;text-transform:uppercase;background:#0d0e0d;z-index:6;position:relative}
 header .brand{display:flex;align-items:center;gap:12px;font-size:14px}header .sigil{color:var(--red);font-size:23px}header .chapter{font-size:11px;color:#b2a48b;letter-spacing:.2em}header .status{font:11px Arial,sans-serif;letter-spacing:.13em;color:#9e9689;display:flex;gap:14px;align-items:center}
-#audioBtn{cursor:pointer;border:1px solid #3f3a31;background:#151512;padding:4px 8px;color:#b9ad98;font:10px Arial,sans-serif;letter-spacing:.12em}#audioBtn:hover{border-color:#8a744f;color:#e8d6b4}
+#audioBtn,#settingsBtn{cursor:pointer;border:1px solid #3f3a31;background:#151512;padding:4px 8px;color:#b9ad98;font:10px Arial,sans-serif;letter-spacing:.12em}#audioBtn:hover,#settingsBtn:hover{border-color:#8a744f;color:#e8d6b4}
 .main{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 268px;gap:14px;padding:14px 18px}
 .scene-wrap{position:relative;min-width:0;overflow:hidden;border:1px solid #5b5141;box-shadow:0 0 45px #000;background:#0b0b0a}
 .scene-wrap:after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.7) 100%),linear-gradient(180deg,rgba(0,0,0,.15),transparent 22%,rgba(0,0,0,.35));z-index:2}
@@ -24,6 +24,9 @@ canvas{width:100%;height:100%;display:block;outline:none;cursor:crosshair;touch-
 .crosshair.hot{transform:scale(1.35);opacity:1}.crosshair.hot:before,.crosshair.hot:after{background:#e9b96e}
 .prompt{position:absolute;left:50%;top:calc(50% + 32px);transform:translateX(-50%);z-index:4;font:11px Arial,sans-serif;letter-spacing:.1em;color:#f0ddb6;background:#141310cc;border:1px solid #6b5941;padding:6px 11px;opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap}
 .prompt.show{opacity:1}.prompt b{color:#e0b875;border:1px solid #8a714b;padding:1px 5px;margin-right:6px;font-weight:400}
+ .settings{position:absolute;top:16px;right:16px;z-index:6;width:min(270px,calc(100% - 32px));padding:14px;background:#11110ff0;border:1px solid #746044;box-shadow:0 8px 26px #000b;font:11px Arial,sans-serif;letter-spacing:.08em;color:#d4c6ad;display:none}.settings.show{display:block}.settings label{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.settings input{width:100%;accent-color:#c13e35}.settings small{display:block;color:#8e8372;line-height:1.5;margin-top:8px}
+ .danger.alarm{animation:alarmPulse .48s steps(2,end) infinite}
+ @keyframes alarmPulse{0%,100%{opacity:.18;box-shadow:inset 0 0 80px 20px rgba(180,8,4,.65)}50%{opacity:.9;box-shadow:inset 0 0 180px 45px rgba(220,12,4,.98)}}
 .hidenote{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:4;font:11px Arial,sans-serif;letter-spacing:.24em;color:#c7b99f;background:#0a0a09d9;padding:7px 13px;border:1px solid #3d372e;display:none}
 .hidenote.show{display:block}
 .danger{position:absolute;inset:0;z-index:2;pointer-events:none;box-shadow:inset 0 0 130px 30px rgba(120,10,6,.85);opacity:0;transition:opacity .25s}
@@ -82,7 +85,7 @@ button.start:hover{background:#4a3622;border-color:#c8a46c;color:#fff3d6;box-sha
 <header>
   <div class="brand"><span class="sigil">✣</span> El Hotel <span style="color:#756b5a">/ Carnicería</span></div>
   <div class="chapter" id="chapter">Ala de huéspedes · 01</div>
-  <div class="status"><span id="clock">02:17 AM · NOCHE 1</span><button id="audioBtn" title="Silenciar">AUDIO ON</button></div>
+  <div class="status"><span id="clock">02:17 AM · NOCHE 1</span><button id="settingsBtn" type="button" title="Ajustes de cámara">AJUSTES</button><button id="audioBtn" title="Silenciar">AUDIO ON</button></div>
 </header>
 <main class="main">
   <section class="scene-wrap" id="stage">
@@ -93,6 +96,7 @@ button.start:hover{background:#4a3622;border-color:#c8a46c;color:#fff3d6;box-sha
     <div class="toast" id="toast"></div>
     <div class="crosshair" id="crosshair"></div>
     <div class="prompt" id="prompt"></div>
+    <div class="settings" id="settingsPanel"><label for="sensitivity">Sensibilidad de cámara <b id="sensitivityValue">1,0×</b></label><input id="sensitivity" type="range" min="0.4" max="2.5" step="0.1" value="1" aria-label="Sensibilidad de cámara"><small>Ajusta la velocidad de giro del ratón y de la cámara táctil.</small></div>
     <div class="hidenote" id="hideNote">ESCONDIDO · MANTÉN LA RESPIRACIÓN</div>
     <div class="fade" id="fade"></div>
 
@@ -100,8 +104,8 @@ button.start:hover{background:#4a3622;border-color:#c8a46c;color:#fff3d6;box-sha
       <div class="intro">
         <div class="eyebrow">Nadie responde desde el piso 13</div>
         <h1>EL HOTEL<br><span>NO DUERME</span></h1>
-        <p>El ascensor se detuvo bajo tierra. Encuentra las llaves y llega al montacargas. La linterna te protege de lo que camina… pero <b>en la luz aparece una cara</b>. No dejes que te alcance.</p>
-        <div class="hint">WASD · MOVER &nbsp;|&nbsp; RATÓN · MIRAR &nbsp;|&nbsp; E · INTERACTUAR<br>SHIFT · CORRER &nbsp;|&nbsp; C · AGACHARSE &nbsp;|&nbsp; F · LINTERNA &nbsp;|&nbsp; Q · USAR OBJETO &nbsp;|&nbsp; CLIC · DISPARAR</div>
+        <p>Despiertas en el ala infectada. Encuentra la llave escondida en un cajón y avanza por el hotel. El demonio patrulla los pasillos: <b>la alarma roja avisa cuando se acerca</b>. Escóndete en un armario o agáchate junto a una mesa para meterte debajo.</p>
+        <div class="hint">WASD · MOVER &nbsp;|&nbsp; RATÓN · MIRAR &nbsp;|&nbsp; E · INTERACTUAR<br>SHIFT · CORRER &nbsp;|&nbsp; C · AGACHARSE / ESCONDERSE BAJO MESA<br>F · LINTERNA &nbsp;|&nbsp; Q · USAR OBJETO &nbsp;|&nbsp; AJUSTES · SENSIBILIDAD</div>
         <button class="start" id="start">Entrar al hotel</button>
       </div>
     </div>
